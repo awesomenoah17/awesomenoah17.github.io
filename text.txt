@@ -1,0 +1,23 @@
+mkdir -p ~/.local/share/applications
+office="$HOME/.wine/drive_c/Program Files (x86)/Microsoft Office/Office12"
+
+while IFS='|' read -r exe name; do
+  if [ -f "$office/$exe" ]; then
+    file="$HOME/.local/share/applications/office-${exe%.EXE}.desktop"
+    printf '[Desktop Entry]\nType=Application\nName=%s\nExec=wine "%s/%s"\nTerminal=false\nCategories=Office;\nStartupNotify=true\n' "$name" "$office" "$exe" > "$file"
+    chmod +x "$file"
+    echo "Created: $name"
+  else
+    echo "Not found: $name"
+  fi
+done <<'EOF'
+WINWORD.EXE|Microsoft Word 2007
+EXCEL.EXE|Microsoft Excel 2007
+POWERPNT.EXE|Microsoft PowerPoint 2007
+MSACCESS.EXE|Microsoft Access 2007
+MSPUB.EXE|Microsoft Publisher 2007
+OUTLOOK.EXE|Microsoft Outlook 2007
+ONENOTE.EXE|Microsoft OneNote 2007
+INFOPATH.EXE|Microsoft InfoPath 2007
+GROOVE.EXE|Microsoft Office Groove 2007
+EOF
