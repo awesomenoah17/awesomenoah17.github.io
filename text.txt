@@ -1,23 +1,67 @@
-mkdir -p ~/.local/share/applications
-office="$HOME/.wine/drive_c/Program Files (x86)/Microsoft Office/Office12"
+cat > /tmp/fix-office.py <<'PY'
+import os, glob, subprocess
 
-while IFS='|' read -r exe name; do
-  if [ -f "$office/$exe" ]; then
-    file="$HOME/.local/share/applications/office-${exe%.EXE}.desktop"
-    printf '[Desktop Entry]\nType=Application\nName=%s\nExec=wine "%s/%s"\nTerminal=false\nCategories=Office;\nStartupNotify=true\n' "$name" "$office" "$exe" > "$file"
-    chmod +x "$file"
-    echo "Created: $name"
-  else
-    echo "Not found: $name"
-  fi
-done <<'EOF'
-WINWORD.EXE|Microsoft Word 2007
-EXCEL.EXE|Microsoft Excel 2007
-POWERPNT.EXE|Microsoft PowerPoint 2007
-MSACCESS.EXE|Microsoft Access 2007
-MSPUB.EXE|Microsoft Publisher 2007
-OUTLOOK.EXE|Microsoft Outlook 2007
-ONENOTE.EXE|Microsoft OneNote 2007
-INFOPATH.EXE|Microsoft InfoPath 2007
-GROOVE.EXE|Microsoft Office Groove 2007
-EOF
+home = os.path.expanduser("~")
+office = home + "/.wine/drive_c/Program Files (x86)/Microsoft Office/Office12"
+apps = home + "/.local/share/applications"
+icons = home + "/.local/share/icons/office2007"
+os.makedirs(apps, exist_ok=True)
+os.makedirs(icons, exist_ok=True)
+
+programs = {
+    "WINWORD.EXE": "Microsoft Word 2007",
+    "EXCEL.EXE": "Microsoft Excel 2007",
+    "POWERPNT.EXE": "Microsoft PowerPoint 2007",
+    "MSACCESS.EXE": "Microsoft Access 2007",
+    "MSPUB.EXE": "Microsoft Publisher 2007",
+    "OUTLOOK.EXE": "Microsoft Outlook 2007",
+    "ONENOTE.EXE": "Microsoft OneNote 2007",
+    "INFOPATH.EXE": "Microsoft InfoPath 2007",
+    "GROOVE.EXE": "Microsoft Office Groove 2007",
+}
+
+for exe, name in programs.items():
+    path = os.path.join(office, exe)
+    if not os.path.isfile(path):
+        continue
+
+    stem = exe.lower().replace(".exe", "")
+    ico = os.path.join(icons, stem + ".ico")
+    png = os.path.join(icons, stem + ".png")
+
+    result = subprocess.run(
+        ["wrestool", "-x", "-t", "14", path],
+        capture_output=True
+    )
+    if result.returncode == 0 and result.stdout:
+        with open(ico, "wb") as f:
+            f.write(result.stdout)
+        subprocess.run(
+            ["icotool", "-x", "-o", icons, ico],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        extracted = glob.glob(os.path.join(icons, stem + "*.png"))
+        if extracted:
+            largest = max(extracted, key=os.path.getsize)
+            if largest != png:
+                import shutil
+                shutil.copy2(largest, png)
+
+    iconline = f"Icon={png}\n" if os.path.isfile(png) else ""
+    desktop = f"""[Desktop Entry]
+Type=Application
+Name={name}
+Exec=env WINEPREFIX="{home}/.wine" wine "{path}"
+{iconline}Terminal=false
+Categories=Office;
+StartupNotify=true
+"""
+    dest = os.path.join(apps, "office2007-" + stem + ".desktop")
+    with open(dest, "w") as f:
+        f.write(desktop)
+    print("Created:", name)
+
+print("Finished.")
+PY
+
+python3 /tmp/fix-office.py
